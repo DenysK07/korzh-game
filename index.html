@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KORZH Clicker</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background-color: #1a1a1a; /* Темний фон */
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none; /* Заборона виділення тексту */
+        }
+
+        /* Заголовок і баланс */
+        .header {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin: 0;
+            color: #f0c420;
+        }
+
+        #score {
+            font-size: 48px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .currency {
+            font-size: 16px;
+            color: #888;
+        }
+
+        /* Сам Корж */
+        .game-area {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+        }
+
+        #korzh-btn {
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background-image: url('korzh.jpg'); /* Твоя картинка */
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 0 30px rgba(240, 196, 32, 0.3);
+            border: 5px solid #f0c420;
+            cursor: pointer;
+            transition: transform 0.1s;
+            -webkit-tap-highlight-color: transparent; /* Прибрати синій квадрат при кліку на Android */
+        }
+
+        /* Анімація натискання */
+        #korzh-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Анімація цифр (+1) */
+        .floating-number {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+
+        /* Меню знизу */
+        .menu {
+            width: 90%;
+            display: flex;
+            justify-content: space-around;
+            padding-bottom: 20px;
+        }
+
+        .menu-btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            width: 30%;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>KORZH COIN</h1>
+        <div class="currency">твій баланс крихт</div>
+        <div id="score">0</div>
+    </div>
+
+    <div class="game-area">
+        <div id="korzh-btn"></div>
+    </div>
+
+    <div class="menu">
+        <button class="menu-btn">⚡️ Boost</button>
+        <button class="menu-btn">👥 Friends</button>
+        <button class="menu-btn">💰 Earn</button>
+    </div>
+
+    <script>
+        // Ініціалізація Telegram
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Розгорнути на весь екран
+
+        // Завантажуємо збережений рахунок з пам'яті телефону
+        let score = localStorage.getItem('korzh_score') ? parseInt(localStorage.getItem('korzh_score')) : 0;
+        const scoreEl = document.getElementById('score');
+        const korzhBtn = document.getElementById('korzh-btn');
+        const gameArea = document.querySelector('.game-area');
+
+        scoreEl.innerText = score;
+
+        // Логіка кліку
+        korzhBtn.addEventListener('click', (e) => {
+            // 1. Додаємо очки
+            score++;
+            scoreEl.innerText = score;
+            localStorage.setItem('korzh_score', score); // Зберігаємо прогрес
+
+            // 2. Вібрація (працює тільки в телефоні)
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+
+            // 3. Анімація цифри +1
+            showFloatingNumber(e.clientX, e.clientY);
+        });
+
+        // Додаткова обробка для мультитачу (щоб клікати кількома пальцями)
+        korzhBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Щоб не було зуму
+            for (let i = 0; i < e.touches.length; i++) {
+                let touch = e.touches[i];
+                score++;
+                scoreEl.innerText = score;
+                localStorage.setItem('korzh_score', score);
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                showFloatingNumber(touch.clientX, touch.clientY);
+            }
+        });
+
+        function showFloatingNumber(x, y) {
+            const el = document.createElement('div');
+            el.classList.add('floating-number');
+            el.innerText = '+1';
+            
+            // Випадковий зсув, щоб цифри не накладалися
+            const randomX = (Math.random() - 0.5) * 40;
+            
+            el.style.left = `${x + randomX}px`;
+            el.style.top = `${y - 20}px`;
+            
+            gameArea.appendChild(el);
+
+            // Видаляємо елемент через 1 секунду
+            setTimeout(() => {
+                el.remove();
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
