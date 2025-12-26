@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KORZH APP v12.1</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* --- 1. CORE STYLES --- */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            background-color: #121212;
+            background-image: radial-gradient(circle at center, #1f1f1f 0%, #000000 100%);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex; flex-direction: column;
+            height: 100vh; margin: 0; overflow: hidden; user-select: none;
+        }
+
+        /* --- 2. SCREENS --- */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; flex-direction: column; 
+            padding-bottom: 90px; overflow-y: auto; background: #121212;
+        }
+        .screen.active { display: flex; z-index: 10; }
+
+        /* --- 3. NAVBAR --- */
+        .navbar {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 75px;
+            background: rgba(20, 20, 20, 0.95); 
+            border-top: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 1000; padding-bottom: 10px;
+        }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: #666; font-size: 10px; font-weight: 600; width: 20%; cursor: pointer; transition: 0.2s; }
+        .nav-item svg { width: 24px; height: 24px; fill: #666; margin-bottom: 4px; transition: 0.2s; }
+        .nav-item.active { color: white; }
+        .nav-item.active svg { fill: white; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }
+
+        .nav-item.center { position: relative; bottom: 15px; }
+        .nav-item.center .circle-bg {
+            width: 60px; height: 60px; background: #222; border: 4px solid #121212;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s;
+        }
+        .nav-item.center svg { fill: #f0c420; width: 32px; height: 32px; margin: 0; }
+        .nav-item.center.active .circle-bg { background: #f0c420; box-shadow: 0 0 20px rgba(240, 196, 32, 0.4); }
+        .nav-item.center.active svg { fill: #000; }
+
+        /* --- 4. HOME --- */
+        .header { width: 100%; padding-top: 50px; text-align: center; }
+        .level-container { width: 85%; margin: 0 auto 10px; }
+        .level-info { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #aaa; margin-bottom: 5px; }
+        .progress-track { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #f0c420, #ff6b6b); transition: width 0.5s ease; }
+
+        #score { font-size: 48px; font-weight: 900; color: white; text-shadow: 0 0 20px rgba(240, 196, 32, 0.4); }
+        .income-badge { font-size: 12px; color: #888; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 10px; }
+
+        #game-area { flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%; perspective: 800px; }
+        #korzh-wrapper { width: 280px; height: 280px; position: relative; transform-style: preserve-3d; transition: transform 0.1s; cursor: pointer; }
+        #korzh-img {
+            width: 100%; height: 100%; background-size: cover; background-position: center; border-radius: 50%;
+            background-color: transparent; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            transition: transform 0.1s;
+        }
+        .click-anim { animation: squash 0.1s ease-in-out; }
+        @keyframes squash { 0% {transform: scale(1);} 50% {transform: scale(0.95);} 100% {transform: scale(1);} }
+
+        /* --- 5. SHOP --- */
+        .page-title { font-size: 28px; font-weight: 900; margin: 40px 0 20px; text-align: center; }
+        .tabs { display: flex; gap: 10px; margin: 0 auto 20px; background: #222; padding: 5px; border-radius: 12px; width: 90%; }
+        .tab { flex: 1; text-align: center; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: bold; color: #777; cursor: pointer; }
+        .tab.active { background: #f0c420; color: black; }
+
+        .shop-list { width: 90%; margin: 0 auto; }
+        .shop-item {
+            display: flex; align-items: center; background: #1a1a1a; padding: 12px; margin-bottom: 10px; 
+            border-radius: 16px; border: 1px solid #333; gap: 12px; transition: 0.3s;
+        }
+        
+        .shop-item.affordable { border: 1px solid #f0c420; box-shadow: 0 0 10px rgba(240, 196, 32, 0.15); }
+        .shop-item.locked { opacity: 0.6; filter: grayscale(0.5); }
+
+        .shop-icon { width: 50px; height: 50px; background: #252525; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; position: relative; overflow: hidden; }
+        .shop-img { width: 100%; height: 100%; object-fit: contain; }
+        .shop-info { flex-grow: 1; }
+        .shop-name { font-weight: bold; font-size: 14px; color: white; display: block; }
+        .shop-desc { font-size: 11px; color: #888; }
+        
+        .buy-btn {
+            background: #f0c420; color: black; border: none; padding: 8px 12px;
+            border-radius: 8px; font-weight: bold; font-size: 11px; min-width: 70px; cursor: pointer;
+        }
+        .buy-btn:disabled { background: #333; color: #555; cursor: not-allowed; }
+        .buy-btn.pop { animation: btnPop 0.3s ease-out; }
+        @keyframes btnPop { 50% {transform: scale(1.15);} }
+
+        /* --- 6. LEADERBOARD --- */
+        .leader-card { background: #1a1a1a; width: 90%; margin: 0 auto; border-radius: 16px; padding: 10px; border: 1px solid #333; }
+        .leader-row { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #2a2a2a; }
+        .leader-row:last-child { border-bottom: none; }
+        .rank { width: 30px; font-weight: bold; font-size: 14px; }
+        .rank-1 { font-size: 20px; }
+        .user-info { flex-grow: 1; font-weight: 600; font-size: 14px; }
+        .user-score { color: #f0c420; font-weight: bold; font-size: 13px; }
+        .gold-text { color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+        .silver-text { color: #C0C0C0; }
+        .bronze-text { color: #CD7F32; }
+
+        /* --- 7. WALLET & UTILS --- */
+        .wallet-box { text-align: center; margin-top: 40px; }
+        .main-btn { width: 90%; background: #0088cc; color: white; padding: 15px; border-radius: 12px; border: none; font-weight: bold; margin-top: 20px; font-size: 16px; }
+        .floating-crumb { position: absolute; width: 30px; height: 30px; pointer-events: none; background-image: url('assets/crumb.png'); background-size: contain; animation: floatUp 0.8s forwards; z-index: 100; }
+        @keyframes floatUp { to { transform: translateY(-120px) scale(1.2); opacity: 0; } }
+        #notify { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); background: #2ed573; padding: 10px 20px; border-radius: 20px; font-weight: bold; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 6000; }
+        #levelup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 5000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
+        .levelup-card { width: 80%; padding: 40px 20px; text-align: center; background: linear-gradient(135deg, rgba(20,20,20,0.9), rgba(40,40,40,0.95)); border-radius: 30px; border: 2px solid #f0c420; box-shadow: 0 0 50px rgba(240, 196, 32, 0.3); animation: popUp 0.5s ease; }
+        @keyframes popUp { from {transform: scale(0.5); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+        .bonus-btn { position: absolute; top: 20px; left: 20px; width: 45px; height: 45px; background: linear-gradient(135deg, #ff9f43, #ee5253); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; border: 2px solid white; box-shadow: 0 5px 15px rgba(238,82,83,0.4); z-index: 50; transition: 0.3s; }
+        .bonus-btn.used { filter: grayscale(1); opacity: 0.6; transform: scale(0.9); }
+    </style>
+</head>
+<body>
+
+    <div id="notify">Notification</div>
+    <div id="levelup-overlay" onclick="this.style.display='none'">
+        <div class="levelup-card">
+            <h3 style="color:#aaa; margin:0;">LEVEL UP!</h3>
+            <h1 style="font-size:42px; color:#f0c420; margin:10px 0;" id="popup-lvl-num">1</h1>
+            <div style="font-size:20px; font-weight:bold;" id="popup-lvl-title">Rookie</div>
+            <div style="margin-top:20px; background:rgba(255,255,255,0.1); padding:10px; border-radius:10px;" id="popup-lvl-reward"></div>
+        </div>
+    </div>
+
+    <div id="screen-shop" class="screen">
+        <div class="page-title">Shop</div>
+        <div class="tabs">
+            <div class="tab active" onclick="switchShop('ovens')" id="tab-ovens">Factories</div>
+            <div class="tab" onclick="switchShop('skins')" id="tab-skins">Skins</div>
+        </div>
+        <div class="shop-list" id="shop-container"></div>
+    </div>
+
+    <div id="screen-tasks" class="screen" style="justify-content:center;">
+        <div style="text-align:center;">
+            <div style="font-size:60px; margin-bottom:20px;">🎁</div>
+            <h2>Tasks</h2>
+            <p style="color:#888;">Coming Soon</p>
+        </div>
+    </div>
+
+    <div id="screen-home" class="screen active">
+        <div class="bonus-btn" id="bonus-btn" onclick="claimBonus()">🎁</div>
+        <div class="header">
+            <div class="level-container">
+                <div class="level-info"><span id="lvl-title">Rookie</span><span>Lvl <span id="lvl-num">1</span></span></div>
+                <div class="progress-track"><div class="progress-fill" id="lvl-fill"></div></div>
+            </div>
+            <div style="display:flex; justify-content:center; align-items:center; gap:10px;">
+                <div id="score">0</div>
+                <img src="assets/crumb.png" style="width:30px;" onerror="this.style.display='none'">
+            </div>
+            <div class="income-badge">Income: <span id="income">0</span>/sec</div>
+        </div>
+        <div id="game-area">
+            <div id="korzh-wrapper">
+                <div id="korzh-img"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-top" class="screen">
+        <div class="page-title">Leaderboard</div>
+        <div class="leader-card">
+            <div class="leader-row"><div class="rank rank-1">🥇</div><div class="user-info gold-text">Elon Musk</div><div class="user-score">10B</div></div>
+            <div class="leader-row"><div class="rank rank-2">🥈</div><div class="user-info silver-text">Satoshi</div><div class="user-score">5B</div></div>
+            <div class="leader-row"><div class="rank rank-3">🥉</div><div class="user-info bronze-text">Durov</div><div class="user-score">1B</div></div>
+            <div class="leader-row" style="background:rgba(240, 196, 32, 0.1); border-radius:10px;"><div class="rank">99</div><div class="user-info">YOU</div><div class="user-score" id="top-bal">0 KORZH</div></div>
+        </div>
+    </div>
+
+    <div id="screen-wallet" class="screen">
+        <div class="page-title">Wallet</div>
+        <div class="wallet-box">
+            <img src="assets/skin_classic.png" style="width:80px; margin-bottom:10px; border-radius:50%; box-shadow:0 0 20px rgba(240,196,32,0.3);" onerror="this.src='assets/crumb.png'">
+            <div style="font-size:40px; font-weight:900; color:#f0c420;"><span id="wallet-val">0</span> KORZH</div>
+            <p style="color:#666;">1 KORZH = 100,000 Crumbs</p>
+            <button class="main-btn" onclick="connectWallet()">Connect TON Wallet</button>
+            <button class="main-btn" style="background:#f0c420; color:black; margin-top:10px;" onclick="exchange()">MINT TOKEN</button>
+        </div>
+    </div>
+
+    <div class="navbar">
+        <div class="nav-item" onclick="nav('shop')" id="nav-shop"><svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0 0 20 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg><span>Shop</span></div>
+        <div class="nav-item" onclick="nav('tasks')" id="nav-tasks"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg><span>Tasks</span></div>
+        <div class="nav-item center active" onclick="nav('home')" id="nav-home"><div class="circle-bg"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></div></div>
+        <div class="nav-item" onclick="nav('top')" id="nav-top"><svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-5 4h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z" style="display:none;"/><path d="M20.2 2H15V1H9v1H3.8C2.58 2 2 3.01 2 4.25c0 2.22 1.27 4.2 3.19 5.17.06.87.21 1.72.43 2.53.5 1.85 1.57 3.49 3.01 4.73l.67 1.32H5v2h14v-2h-4.3l.67-1.32c1.44-1.24 2.51-2.88 3.01-4.73.23-.81.37-1.66.43-2.53C20.73 8.45 22 6.47 22 4.25 22 3.01 21.42 2 20.2 2zM4 4.25C4 3.73 4.22 3.5 4.5 3.5H9v5.72C6.01 8.52 4 6.71 4 4.25zm11 11.25c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm4.5-11c.28 0 .5.23.5.75 0 2.46-2.01 4.27-5 4.97V3.5h4.5z"/></svg><span>Top</span></div>
+        <div class="nav-item" onclick="nav('wallet')" id="nav-wallet"><svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg><span>Wallet</span></div>
+    </div>
+
+    <audio id="click-sound" src="assets/click.mp3"></audio>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if(tg) tg.expand();
+
+        // --- DATA ---
+        const LEVELS = [
+            { min: 0, title: 'Rookie' }, { min: 1000, title: 'Mixer' }, { min: 10000, title: 'Novice' },
+            { min: 100000, title: 'Artisan' }, { min: 1000000, title: 'Panda Baker', skin: 'panda' },
+            { min: 10000000, title: 'Operator' }, { min: 50000000, title: 'Chef' },
+            { min: 200000000, title: 'Engineer' }, { min: 500000000, title: 'Legend' },
+            { min: 1000000000, title: 'Billionaire', skin: 'major' }
+        ];
+
+        const OVENS = [
+            { name: 'Oven', base: 1000, inc: 2, img: 'assets/oven1.png', fallback: '👵' },
+            { name: 'Electric', base: 5000, inc: 8, img: 'assets/oven2.png', fallback: '🔌' },
+            { name: 'Factory', base: 20000, inc: 30, img: 'assets/oven3.png', fallback: '🏭' },
+            { name: 'Plant', base: 100000, inc: 150, img: 'assets/oven4.png', fallback: '🏗' },
+            { name: 'Turbo', base: 500000, inc: 900, img: 'assets/oven5.png', fallback: '🚀' },
+            { name: 'MEGA', base: 1500000, inc: 2500, img: 'assets/oven6.png', fallback: '🌋' }
+        ];
+
+        const SKINS = [
+            { id: 'classic', name: 'Classic', price: 0, icon: '🥯' },
+            { id: 'happy', name: 'Happy', price: 50000, icon: '😄' },
+            { id: 'choco', name: 'Choco', price: 100000, icon: '🍫' },
+            { id: 'robot', name: 'Robot', price: 200000, icon: '🤖' },
+            { id: 'demon', name: 'Demon', price: 666666, icon: '😈' },
+            { id: 'space', name: 'Cosmos', price: 500000, icon: '👽' },
+            { id: 'panda', name: 'Panda', price: 0, icon: '🐼', locked: true },
+            { id: 'major', name: 'Major', price: 0, icon: '🎩', locked: true }
+        ];
+
+        let game = { score: 0, totalScore: 0, tokens: 0, ovens: [0,0,0,0,0,0], skins: ['classic'], activeSkin: 'classic', maxLvl: 0, lastBonus: 0 };
+        try { const s = localStorage.getItem('korzh_v12_1'); if(s) { const p=JSON.parse(s); if(p.ovens.length===6) game=p; }} catch(e){}
+
+        // Init
+        let curTab = 'ovens';
+        updateUI();
+        setInterval(() => {
+            let p = 0; game.ovens.forEach((c, i) => p += c * OVENS[i].inc);
+            if(p>0) { game.score += p; game.totalScore += p; checkLevel(); save(); updateUI(); }
+            checkBonus();
+        }, 1000);
+        document.getElementById('korzh-img').style.backgroundImage = `url('assets/skin_${game.activeSkin}.png')`;
+
+        // --- NAVIGATION ---
+        function nav(s) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById('screen-'+s).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-'+s).classList.add('active');
+            if(s==='shop') renderShop();
+            if(s==='wallet' || s==='top') updateUI();
+        }
+
+        // --- SHOP ---
+        function switchShop(t) {
+            curTab = t;
+            document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+            document.getElementById('tab-'+t).classList.add('active');
+            renderShop();
+        }
+
+        function renderShop() {
+            const cont = document.getElementById('shop-container');
+            cont.innerHTML = '';
+            
+            if(curTab === 'ovens') {
+                OVENS.forEach((o, i) => {
+                    const cnt = game.ovens[i];
+                    const cost = Math.floor(o.base * Math.pow(1.2, cnt));
+                    const canBuy = game.score >= cost;
+                    const max = cnt >= 25;
+                    const styleClass = canBuy && !max ? 'affordable' : 'locked';
+
+                    cont.innerHTML += `
+                    <div class="shop-item ${styleClass}">
+                        <div class="shop-icon">
+                            <img src="${o.img}" class="shop-img" onerror="this.style.display='none';this.parentElement.innerText='${o.fallback}'">
+                        </div>
+                        <div class="shop-info">
+                            <span class="shop-name">${o.name} <span style="color:#f0c420">x${cnt}</span></span>
+                            <span class="shop-desc">+${o.inc}/sec</span>
+                        </div>
+                        <button id="btn-oven-${i}" class="buy-btn" onclick="buyOven(${i})" ${!canBuy || max ? 'disabled' : ''}>
+                            ${max ? 'MAX' : cost.toLocaleString()}
+                        </button>
+                    </div>`;
+                });
+            } else {
+                SKINS.forEach(s => {
+                    const owned = game.skins.includes(s.id);
+                    const active = game.activeSkin === s.id;
+                    const canBuy = game.score >= s.price;
+                    const styleClass = (canBuy && !owned && !s.locked) ? 'affordable' : (owned ? '' : 'locked');
+                    
+                    let btn = '';
+                    if(s.locked && !owned) btn = `<button class="buy-btn" disabled style="background:#444">🔒 Lvl</button>`;
+                    else if(active) btn = `<button class="buy-btn" disabled style="background:#2ed573;color:white">Active</button>`;
+                    else if(owned) btn = `<button class="buy-btn" onclick="setSkin('${s.id}')" style="background:#555;color:white">Equip</button>`;
+                    else btn = `<button class="buy-btn" onclick="buySkin('${s.id}')" ${!canBuy ? 'disabled' : ''}>${s.price.toLocaleString()}</button>`;
+
+                    cont.innerHTML += `
+                    <div class="shop-item ${styleClass}">
+                        <div class="shop-icon">
+                            <img src="assets/skin_${s.id}.png" class="shop-img" onerror="this.style.display='none';this.parentElement.innerText='${s.icon}'">
+                        </div>
+                        <div class="shop-info"><span class="shop-name">${s.name}</span></div>
+                        ${btn}
+                    </div>`;
+                });
+            }
+        }
+
+        // --- ACTIONS ---
+        function buyOven(i) {
+            const cost = Math.floor(OVENS[i].base * Math.pow(1.2, game.ovens[i]));
+            if(game.score >= cost) {
+                game.score -= cost; game.ovens[i]++;
+                document.getElementById('btn-oven-'+i).classList.add('pop');
+                setTimeout(()=>document.getElementById('btn-oven-'+i).classList.remove('pop'),300);
+                save(); updateUI(); renderShop();
+            }
+        }
+
+        function buySkin(id) {
+            const s = SKINS.find(x=>x.id===id);
+            if(game.score >= s.price) {
+                game.score -= s.price; game.skins.push(id);
+                save(); renderShop(); notify("Unlocked!");
+            }
+        }
+        function setSkin(id) {
+            game.activeSkin = id;
+            document.getElementById('korzh-img').style.backgroundImage = `url('assets/skin_${id}.png')`;
+            save(); renderShop();
+        }
+        function exchange() {
+            if(game.score >= 100000) { game.score -= 100000; game.tokens++; save(); updateUI(); notify("Minted!"); }
+            else notify("Need 100k Crumbs");
+        }
+        function connectWallet() { notify("Connecting TON..."); }
+
+        // --- CORE ---
+        const wrap = document.getElementById('korzh-wrapper');
+        wrap.addEventListener('touchstart', tap, {passive:false});
+        wrap.addEventListener('mousedown', tap);
+
+        function tap(e) {
+            e.preventDefault();
+            addScore(1);
+            
+            // Anim
+            wrap.style.transform = "scale(0.95)";
+            setTimeout(()=>wrap.style.transform="scale(1)", 80);
+            
+            const el = document.createElement('div'); el.className = 'floating-crumb';
+            el.style.left = (e.clientX||e.touches[0].clientX)+'px';
+            el.style.top = (e.clientY||e.touches[0].clientY)+'px';
+            document.body.appendChild(el); setTimeout(()=>el.remove(), 800);
+
+            const au = document.getElementById('click-sound');
+            if(au) { au.currentTime=0; au.play().catch(()=>{}); }
+        }
+
+        function addScore(n) { game.score += n; game.totalScore += n; checkLevel(); save(); updateUI(); }
+
+        function checkLevel() {
+            let idx = 0;
+            for(let i=LEVELS.length-1; i>=0; i--) { if(game.totalScore >= LEVELS[i].min) { idx = i; break; } }
+            
+            if(idx > game.maxLvl) {
+                game.maxLvl = idx;
+                const l = LEVELS[idx];
+                document.getElementById('popup-lvl-num').innerText = idx+1;
+                document.getElementById('popup-lvl-title').innerText = l.title;
+                document.getElementById('popup-lvl-reward').innerText = l.skin ? `Unlocked: ${l.skin}` : 'Keep going!';
+                document.getElementById('levelup-overlay').style.display = 'flex';
+                if(l.skin && !game.skins.includes(l.skin)) game.skins.push(l.skin);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').innerText = Math.floor(game.score).toLocaleString();
+            document.getElementById('wallet-val').innerText = game.tokens;
+            document.getElementById('top-bal').innerText = game.tokens + " KORZH";
+            
+            let inc = 0; game.ovens.forEach((c, i) => inc += c * OVENS[i].inc);
+            document.getElementById('income').innerText = inc.toLocaleString();
+
+            // Level
+            const lvlIdx = game.maxLvl;
+            const curLvl = LEVELS[lvlIdx];
+            const nextLvl = LEVELS[lvlIdx+1];
+            document.getElementById('lvl-num').innerText = lvlIdx+1;
+            document.getElementById('lvl-title').innerText = curLvl.title;
+            
+            if(nextLvl) {
+                const range = nextLvl.min - curLvl.min;
+                const prog = ((game.totalScore - curLvl.min) / range) * 100;
+                document.getElementById('lvl-fill').style.width = Math.min(100, prog) + "%";
+            } else document.getElementById('lvl-fill').style.width = "100%";
+        }
+
+        function checkBonus() {
+            const d = 4*3600*1000 - (Date.now() - game.lastBonus);
+            const b = document.getElementById('bonus-btn');
+            if(d > 0) b.classList.add('used'); else b.classList.remove('used');
+        }
+        function claimBonus() {
+            if(Date.now() - game.lastBonus > 4*3600*1000) { addScore(1000); game.lastBonus=Date.now(); checkBonus(); notify("Bonus +1000"); }
+        }
+
+        function notify(m) { const n=document.getElementById('notify'); n.innerText=m; n.style.opacity=1; setTimeout(()=>n.style.opacity=0,2000); }
+        function save() { localStorage.setItem('korzh_v12_1', JSON.stringify(game)); }
+
+    </script>
+</body>
+</html>
