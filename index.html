@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KORZH APP v18.0 (Web3 & Firebase)</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #121212; background-image: radial-gradient(circle at center, #1f1f1f 0%, #000000 100%); color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; user-select: none; }
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; padding-bottom: 90px; overflow-y: auto; background: #121212; }
+        .screen.active { display: flex; z-index: 10; }
+        .navbar { position: fixed; bottom: 0; left: 0; width: 100%; height: 75px; background: rgba(20, 20, 20, 0.95); border-top: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); display: flex; justify-content: space-around; align-items: center; z-index: 1000; padding-bottom: 10px; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: #666; font-size: 10px; font-weight: 600; width: 20%; cursor: pointer; transition: 0.2s; }
+        .nav-item svg { width: 24px; height: 24px; fill: #666; margin-bottom: 4px; transition: 0.2s; }
+        .nav-item.active { color: white; }
+        .nav-item.active svg { fill: white; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5)); }
+        .nav-item.center { position: relative; bottom: 15px; }
+        .nav-item.center .circle-bg { width: 60px; height: 60px; background: #222; border: 4px solid #121212; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s; }
+        .nav-item.center svg { fill: #f0c420; width: 32px; height: 32px; margin: 0; }
+        .nav-item.center.active .circle-bg { background: #f0c420; box-shadow: 0 0 20px rgba(240, 196, 32, 0.4); }
+        .nav-item.center.active svg { fill: #000; }
+        .header { width: 100%; padding-top: 50px; text-align: center; }
+        .level-container { width: 85%; margin: 0 auto 10px; }
+        .level-info { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #aaa; margin-bottom: 5px; }
+        .progress-track { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #f0c420, #ff6b6b); transition: width 0.5s ease; }
+        #score { font-size: 48px; font-weight: 900; color: white; text-shadow: 0 0 20px rgba(240, 196, 32, 0.4); }
+        .income-badge { font-size: 12px; color: #888; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 10px; }
+        #game-area { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; perspective: 800px; position: relative; gap: 30px; }
+        #korzh-wrapper { width: 240px; height: 240px; position: relative; transform-style: preserve-3d; transition: transform 0.1s; cursor: pointer; z-index: 10; }
+        #korzh-img { width: 100%; height: 100%; background-size: cover; background-position: center; border-radius: 50%; background-color: transparent; box-shadow: 0 20px 60px rgba(0,0,0,0.6); transition: transform 0.1s; }
+        .slots-container { display: flex; gap: 15px; justify-content: center; align-items: center; z-index: 10; }
+        .equip-slot { width: 60px; height: 60px; background: rgba(255,255,255,0.05); border: 2px dashed #555; border-radius: 12px; display:flex; justify-content:center; align-items:center; cursor: pointer; overflow: hidden; font-size: 9px; text-align: center; color: #777; font-weight: bold; flex-direction: column; position: relative; }
+        .equip-slot.filled { border: 2px solid #f0c420; }
+        .slot-img-bg { width: 100%; height: 100%; background-size: cover; background-position: center; display:flex; justify-content:center; align-items:center; font-size: 24px; }
+        .page-title { font-size: 28px; font-weight: 900; margin: 40px 0 20px; text-align: center; }
+        .tabs { display: flex; gap: 10px; margin: 0 auto 20px; background: #222; padding: 5px; border-radius: 12px; width: 90%; }
+        .tab { flex: 1; text-align: center; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: bold; color: #777; cursor: pointer; }
+        .tab.active { background: #f0c420; color: black; }
+        .inv-filter { background: #222; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: bold; outline: none; flex: 1; text-align: center; cursor: pointer; }
+        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 90%; margin: 0 auto; padding-bottom: 30px; }
+        .grid-card { background: transparent; border-radius: 12px; position: relative; perspective: 1000px; height: 160px; }
+        .card-inner { width: 100%; height: 100%; transition: transform 0.5s; transform-style: preserve-3d; position: relative; }
+        .card-inner.flipped { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: #1a1a1a; border-radius: 12px; border: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding: 12px; }
+        .card-back { transform: rotateY(180deg); background: #222; justify-content: center; text-align: center; padding: 15px; }
+        .card-desc { font-size: 12px; color: #ccc; line-height: 1.4; }
+        .info-btn { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 1px solid #666; color: #ccc; font-size: 12px; font-weight: bold; display: flex; justify-content: center; align-items: center; z-index: 10; cursor: pointer; transition: 0.2s; }
+        .info-btn:active { transform: scale(0.9); background: white; color: black; }
+        .card-img-box { flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%; margin-bottom: 8px; }
+        .card-img-box img { max-width: 60px; max-height: 60px; object-fit: contain; border-radius: 8px; }
+        .card-title { font-size: 12px; font-weight: bold; margin-bottom: 2px; text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-subtitle { font-size: 10px; color: #888; margin-bottom: 8px; text-align: center; }
+        .card-btn { width: 100%; background: #444; color: white; border: none; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 11px; cursor: pointer; transition: 0.2s; }
+        .card-btn.buy { background: #f0c420; color: black; }
+        .card-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .tickets-badge { text-align: center; color: #f0c420; font-weight: bold; font-size: 16px; margin-bottom: 15px; display: flex; justify-content: center; align-items: center; gap: 5px; }
+        .task-card { background: #1a1a1a; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .task-info { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+        .task-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        .task-desc { font-size: 11px; color: #888; }
+        .task-btn { background: #0088cc; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .task-btn.done { background: #2ed573; cursor: not-allowed; }
+        .leader-card { background: #1a1a1a; width: 90%; margin: 0 auto; border-radius: 16px; padding: 10px; border: 1px solid #333; }
+        .leader-row { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #2a2a2a; }
+        .leader-row:last-child { border-bottom: none; }
+        .rank { width: 30px; font-weight: bold; font-size: 14px; }
+        .user-info { flex-grow: 1; font-weight: 600; font-size: 14px; text-align: left; }
+        .user-score { color: #f0c420; font-weight: bold; font-size: 13px; }
+        .floating-crumb { position: absolute; width: 30px; height: 30px; pointer-events: none; background-size: contain; background-repeat: no-repeat; background-position: center; animation: floatUp 0.8s forwards; z-index: 100; }
+        .floating-ticket { position: absolute; width: 40px; height: 40px; pointer-events: none; background-size: contain; background-repeat: no-repeat; background-position: center; animation: floatUp 1.5s forwards; z-index: 105; filter: drop-shadow(0 0 10px rgba(255,215,0,0.8)); }
+        @keyframes floatUp { to { transform: translateY(-120px) scale(1.2); opacity: 0; } }
+        #notify { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); background: #2ed573; padding: 10px 20px; border-radius: 20px; font-weight: bold; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 9999; display: flex; align-items: center; gap: 5px; }
+        .bonus-btn { position: absolute; top: 20px; left: 20px; width: 45px; height: 45px; background: linear-gradient(135deg, #ff9f43, #ee5253); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; border: 2px solid white; box-shadow: 0 5px 15px rgba(238,82,83,0.4); z-index: 50; transition: 0.3s; cursor: pointer; }
+        .bonus-btn.used { filter: grayscale(1); opacity: 0.6; transform: scale(0.9); }
+        .bonus-btn.ready { animation: jump 0.5s infinite alternate; box-shadow: 0 0 15px #ee5253; }
+        @keyframes jump { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+        #levelup-overlay, #offline-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 5000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
+        .popup-card { width: 80%; padding: 40px 20px; text-align: center; background: linear-gradient(135deg, rgba(20,20,20,0.9), rgba(40,40,40,0.95)); border-radius: 30px; border: 2px solid #f0c420; box-shadow: 0 0 50px rgba(240, 196, 32, 0.3); animation: popUp 0.5s ease; }
+        @keyframes popUp { from {transform: scale(0.5); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+        #inventory-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 5000; display: none; flex-direction: column; overflow-y: auto;}
+        .close-inv-btn { margin: 20px auto; width: 90%; background: #333; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; }
+        #chest-anim-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 6000; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        .chest-anim-box { width: 150px; height: 150px; display: flex; justify-content: center; align-items: center; font-size: 80px; filter: drop-shadow(0 0 20px rgba(255,255,255,0.5)); }
+        .shake-anim { animation: chestShake 0.5s ease-in-out infinite; }
+        .flash-anim { animation: whiteFlash 0.5s ease-out forwards; }
+        @keyframes chestShake { 0%,100%{transform:translate(0,0) rotate(0)} 25%{transform:translate(-5px,0) rotate(10deg)} 75%{transform:translate(5px,0) rotate(-10deg)} }
+        @keyframes whiteFlash { 0% { filter: brightness(1); transform: scale(1); } 50% { filter: brightness(10); transform: scale(1.5); } 100% { filter: brightness(1); transform: scale(1); opacity: 0; } }
+        .reward-popup { display: none; width: 200px; height: 250px; perspective: 1000px; animation: popUp 0.5s ease; margin-bottom: 20px; }
+        #mint-anim { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 7000; display: none; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); }
+        
+        /* НОВА ОПТИМІЗОВАНА АНІМАЦІЯ МІНТУ */
+        .coin-flip { width: 100px; height: 100px; background-image: url('assets/skin_classic1.png'); background-size: cover; border-radius: 50%; box-shadow: 0 0 15px #f0c420; animation: popCoin 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+        @keyframes popCoin { 0% { transform: translateY(50px) scale(0.5); opacity: 0; } 30% { transform: translateY(-30px) scale(1.2); opacity: 1; } 100% { transform: translateY(-50px) scale(1); opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div id="notify">Notification</div>
+
+    <div id="offline-overlay" onclick="this.style.display='none'">
+        <div class="popup-card">
+            <h3 style="color:#aaa; margin:0;">Welcome Back!</h3>
+            <div style="font-size:50px; margin:10px 0;">🌙</div>
+            <div style="font-size:16px; color:#ccc;">While you were sleeping, your bakeries earned:</div>
+            <h1 style="font-size:36px; color:#f0c420; margin:10px 0;">+<span id="offline-crumbs">0</span></h1>
+            <button class="card-btn buy" style="padding: 15px; font-size:16px;">COLLECT</button>
+        </div>
+    </div>
+
+    <div id="levelup-overlay" onclick="this.style.display='none'">
+        <div class="popup-card">
+            <h3 style="color:#aaa; margin:0;">LEVEL UP!</h3>
+            <h1 style="font-size:42px; color:#f0c420; margin:10px 0;" id="popup-lvl-num">1</h1>
+            <div style="font-size:20px; font-weight:bold;" id="popup-lvl-title">Rookie</div>
+            <div style="margin-top:20px; background:rgba(255,255,255,0.1); padding:10px; border-radius:10px;" id="popup-lvl-reward"></div>
+        </div>
+    </div>
+
+    <div id="chest-anim-modal">
+        <div class="chest-anim-box" id="chest-shaking-img"></div>
+        <div class="reward-popup" id="chest-reward-box"></div>
+        <button class="card-btn buy" id="chest-close-btn" style="display:none; width: 200px; padding: 15px; font-size:16px;" onclick="closeChestAnim()">AWESOME!</button>
+    </div>
+
+    <div id="mint-anim"><div class="coin-flip"></div></div>
+
+    <div id="inventory-screen">
+        <div class="page-title" id="inv-title">Equip</div>
+        <div class="shop-grid" id="inv-list"></div>
+        <button class="close-inv-btn" onclick="closeInventory()">BACK TO KORZH</button>
+    </div>
+
+    <div id="screen-shop" class="screen">
+        <div class="page-title">Shop</div>
+        <div class="tabs"><div class="tab active" onclick="switchShop('ovens')" id="tab-ovens">Factories</div><div class="tab" onclick="switchShop('skins')" id="tab-skins">Skins</div></div>
+        <div class="shop-grid" id="shop-container"></div>
+    </div>
+
+    <div id="screen-chests" class="screen">
+        <div class="page-title">Loot</div>
+        <div class="tickets-badge"><img src="assets/ticket.png" style="width:24px;" onerror="this.style.display='none'"> Tickets: <span id="ui-tickets">0</span></div>
+        <div class="tabs"><div class="tab active" onclick="switchChestsTab('chests')" id="tab-chests-buy">Chests</div><div class="tab" onclick="switchChestsTab('inventory')" id="tab-chests-inv">Inventory</div></div>
+        <div id="inv-filters" style="display:none; gap:10px; margin: 0 auto 15px; width:90%; justify-content:center;">
+            <select class="inv-filter" id="filter-slot" onchange="renderGlobalInventory()"><option value="all">All Slots</option><option value="slot1">Hand</option><option value="slot2">Head</option><option value="slot3">Body</option><option value="slot4">Aura</option></select>
+            <select class="inv-filter" id="filter-rarity" onchange="renderGlobalInventory()"><option value="all">All Rarities</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="epic">Epic</option><option value="legendary">Legendary</option></select>
+        </div>
+        <div class="shop-grid" id="chests-container"></div>
+        <div class="shop-grid" id="global-inventory-container" style="display:none;"></div>
+    </div>
+
+    <div id="screen-home" class="screen active">
+        <div class="bonus-btn" id="bonus-btn" onclick="claimBonus()">🎁</div>
+        <div class="header">
+            <div class="level-container"><div class="level-info"><span id="lvl-title">Rookie</span><span>Lvl <span id="lvl-num">1</span></span></div><div class="progress-track"><div class="progress-fill" id="lvl-fill"></div></div></div>
+            <div style="display:flex; justify-content:center; align-items:center; gap:10px;"><div id="score">0</div><img src="assets/crumb.png" style="width:30px;" onerror="this.style.display='none'"></div>
+            <div class="income-badge">Income: <span id="income">0</span>/sec</div>
+        </div>
+        <div id="game-area">
+            <div id="korzh-wrapper" onpointerdown="tap(event)">
+                <div id="korzh-img"></div>
+            </div>
+            <div class="slots-container">
+                <div class="equip-slot" id="ui-slot1" onclick="openInventory('slot1')">SLOT 1<br>Hand</div>
+                <div class="equip-slot" id="ui-slot2" onclick="openInventory('slot2')">SLOT 2<br>Head</div>
+                <div class="equip-slot" id="ui-slot3" onclick="openInventory('slot3')">SLOT 3<br>Body</div>
+                <div class="equip-slot" id="ui-slot4" onclick="openInventory('slot4')">SLOT 4<br>Aura</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-taskstop" class="screen">
+        <div class="page-title">Activity</div>
+        <div class="tabs"><div class="tab active" onclick="switchTaskTop('tasks')" id="tab-tt-tasks">Tasks</div><div class="tab" onclick="switchTaskTop('top')" id="tab-tt-top">Top Leaders</div></div>
+        
+        <div id="view-tasks" style="width: 90%; margin: 20px auto;">
+            <div style="background: #1a1a1a; border: 1px solid #f0c420; border-radius: 15px; padding: 20px; text-align: left; margin-bottom: 20px; position: relative; overflow: hidden; box-shadow: 0 5px 15px rgba(240,196,32,0.1);">
+                <div style="position: absolute; right: -20px; top: -10px; opacity: 0.15; transform: rotate(15deg);">
+                    <img src="assets/ticket.png" style="width:120px;">
+                </div>
+                <h3 style="margin: 0 0 8px; color: #f0c420; position: relative; z-index: 2;">Invite Friends</h3>
+                <p style="font-size: 13px; margin: 0 0 15px; color: #ccc; position: relative; z-index: 2;">Earn <img src="assets/ticket.png" style="width:14px; vertical-align:middle; margin:0 2px;"> +1 Ticket per friend!</p>
+                <button class="card-btn buy" style="width: 100%; font-size: 14px; padding: 12px; position: relative; z-index: 2;" onclick="inviteFriend()">SHARE LINK</button>
+                
+                <div style="margin-top: 15px; display: flex; justify-content: space-between; font-size: 11px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; position: relative; z-index: 2; border: 1px solid #333;">
+                    <span>Friends Invited: <strong style="color:white;" id="ui-friends-count">0</strong></span>
+                </div>
+                <div id="friends-list" style="margin-top: 10px; max-height: 100px; overflow-y: auto; font-size: 12px; color: #aaa; position: relative; z-index: 2;">
+                    No friends invited yet.
+                </div>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #aaa;">More Tasks</h3>
+            <div id="tasks-list"></div>
+        </div>
+
+        <div id="view-top" style="display:none;">
+            <div class="leader-card">
+                <div class="leader-row" style="background:rgba(240, 196, 32, 0.1); border-radius:10px;"><div class="rank">?</div><div class="user-info" id="my-tg-name">YOU</div><div class="user-score" id="top-bal">0 KORZH</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-wallet" class="screen">
+        <div class="page-title">Wallet</div>
+        <div style="padding: 20px;">
+            <div style="background: linear-gradient(135deg, #f0c420 0%, #cc9a06 100%); width: 100%; height: 180px; border-radius: 20px; padding: 20px; color: black; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 10px 20px rgba(240,196,32,0.3); position: relative; overflow: hidden;">
+                <div>
+                    <div style="font-size: 12px; font-weight: bold; opacity: 0.8;">MAIN BALANCE (CRUMBS)</div>
+                    <div style="font-size: 32px; font-weight: 900;" id="wallet-crumbs">0</div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div style="font-family: monospace; font-size: 14px; font-weight: bold;" id="wallet-holder-name">KORZH HOLDER</div>
+                    <div style="font-family: monospace; font-size: 14px;">**** 2026</div>
+                </div>
+            </div>
+
+            <div style="background: #1a1a1a; border-radius: 15px; padding: 20px; margin-top: 20px; display: flex; align-items: center; gap: 15px; border: 1px solid #333;">
+                <img src="assets/skin_classic1.png" style="width: 50px; border-radius: 50%; box-shadow: 0 0 10px rgba(240,196,32,0.5);" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22gold%22/></svg>'">
+                <div style="flex-grow: 1;">
+                    <div style="color: #888; font-size: 12px; font-weight: bold;">CRYPTO ASSETS</div>
+                    <div style="font-size: 24px; font-weight: 900; color: #f0c420;"><span id="wallet-tokens">0</span> KORZH</div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-around; margin-top: 20px;">
+                <div onclick="exchange()" style="display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+                    <div style="width: 50px; height: 50px; background: #222; border-radius: 15px; display: flex; justify-content: center; align-items: center; border: 1px solid #f0c420;">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.25 1.64-1.74 0-2.26-.95-2.32-1.81h-1.7c.07 1.61 1.14 2.76 2.77 3.13V19h1.9v-1.67c1.55-.28 2.8-1.15 2.8-2.92-.01-1.99-1.5-2.73-3.07-3.13z"/></svg>
+                    </div>
+                    <span style="font-size: 12px; font-weight: bold;">MINT</span>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <div id="ton-connect-wrapper" style="height: 50px; display: flex; justify-content: center; align-items: center;"></div>
+                    <span style="font-size: 12px; font-weight: bold;">WALLET</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; background: #1a1a1a; border-radius: 15px; padding: 15px;">
+                <div style="color: #666; font-size: 12px; margin-bottom: 10px;">EXCHANGE RATE (GROWS 10% EVERY MINT)</div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                    <span>1 KORZH</span>
+                    <span style="color: #f0c420;"><span id="exchange-rate">10,000</span> Crumbs</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h3 style="font-size: 16px; margin-bottom: 10px; color: #aaa;">Recent Transactions</h3>
+                <div id="tx-history" style="display:flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="navbar">
+        <div class="nav-item" onclick="nav('shop')" id="nav-shop"><svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0 0 20 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg><span>Shop</span></div>
+        <div class="nav-item" onclick="nav('chests')" id="nav-chests"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zm10 16H4V8h16v12z"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg><span>Chests</span></div>
+        <div class="nav-item center active" onclick="nav('home')" id="nav-home"><div class="circle-bg"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></div></div>
+        <div class="nav-item" onclick="nav('taskstop')" id="nav-taskstop"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg><span>Tasks</span></div>
+        <div class="nav-item" onclick="nav('wallet')" id="nav-wallet"><svg viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg><span>Wallet</span></div>
+    </div>
+<script>
+        // --- 1. FIREBASE SETUP ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBJ_Hv-Usw4oU3hjSnsmFN6JEwKcPdVG3c",
+            authDomain: "korzh-game.firebaseapp.com",
+            projectId: "korzh-game",
+            storageBucket: "korzh-game.firebasestorage.app",
+            messagingSenderId: "1033941851426",
+            appId: "1:1033941851426:web:d653754d613a14f8c1197b",
+            measurementId: "G-TDF28PYELS"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // --- 2. TELEGRAM DATA & USERNAME ---
+        const tg = window.Telegram?.WebApp;
+        if(tg) tg.expand();
+        const tgUser = tg?.initDataUnsafe?.user;
+        
+        let isDataLoaded = false;
+        let tgUsername = "Player";
+
+        if (tgUser) {
+            tgUsername = tgUser.username ? '@' + tgUser.username : tgUser.first_name || "Player";
+            const leaderNameElem = document.getElementById('my-tg-name');
+            if(leaderNameElem) leaderNameElem.innerText = tgUsername + " (YOU)";
+            const walletNameElem = document.getElementById('wallet-holder-name');
+            if(walletNameElem) walletNameElem.innerText = tgUsername.toUpperCase();
+        }
+
+        // --- 3. TON CONNECT ---
+        const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+            manifestUrl: 'https://denysk07.github.io/korzh-game/tonconnect-manifest.json',
+            buttonRootId: 'ton-connect-wrapper'
+        });
+
+        tonConnectUI.uiOptions = {
+            twaReturnUrl: 'https://t.me/Crypto_trade_KORZH_bot' 
+        };
+
+        // --- 4. AUDIO PRELOAD & LOGIC ---
+        const sfx = { 
+            click: new Audio('assets/click.mp3'), 
+            open: new Audio('assets/sounds/chest_open.mp3'), 
+            chime: new Audio('assets/sounds/magic_chime.mp3') 
+        };
+        Object.values(sfx).forEach(a => a.load());
+
+        function playSound(name) { 
+            try { 
+                if(sfx[name]) {
+                    const soundClone = sfx[name].cloneNode(); 
+                    soundClone.volume = 0.5; 
+                    soundClone.play().catch(e => console.log("Audio blocked:", e)); 
+                }
+            } catch(e) {} 
+        }
+
+        // --- 5. GAME DATABASES ---
+        const LEVELS = [
+            { min: 0, title: 'Rookie' }, { min: 5000, title: 'Mixer' }, { min: 25000, title: 'Novice' },
+            { min: 100000, title: 'Artisan' }, { min: 500000, title: 'Panda Baker', skin: 'panda' },
+            { min: 1000000, title: 'Operator' }, { min: 2500000, title: 'Chef' },
+            { min: 5000000, title: 'Engineer' }, { min: 7500000, title: 'Legend' },
+            { min: 10000000, title: 'Billionaire', skin: 'major' }
+        ];
+
+        const OVENS = [
+            { name: 'Oven', base: 100, inc: 0.5, img: 'assets/oven1.png', fb: '👵', desc: 'Granny\'s secret recipe.' },
+            { name: 'Electric', base: 750, inc: 2, img: 'assets/oven2.png', fb: '🔌', desc: 'Stable and modern.' },
+            { name: 'Factory', base: 3000, inc: 10, img: 'assets/oven3.png', fb: '🏭', desc: 'Industrial baking.' },
+            { name: 'Plant', base: 15000, inc: 40, img: 'assets/oven4.png', fb: '🏗', desc: 'City-scale production.' },
+            { name: 'Turbo', base: 80000, inc: 150, img: 'assets/oven5.png', fb: '🚀', desc: 'Rocket-powered heat.' },
+            { name: 'MEGA', base: 300000, inc: 500, img: 'assets/oven6.png', fb: '🌋', desc: 'Volcanic energy.' }
+        ];
+
+        const SKINS = [
+            { id: 'classic', name: 'Classic', price: 0, icon: '🥯', desc: 'The original Korzh.', crumbs: ['crumb_classic_1.png'] },
+            { id: 'happy', name: 'Happy', price: 25000, icon: '😄', desc: 'Always smiling.', crumbs: ['crumb_happy_1.png', 'crumb_happy_2.png'] },
+            { id: 'choco', name: 'Choco', price: 75000, icon: '🍫', desc: 'Premium chocolate.', crumbs: ['crumb_choco_1.png'] },
+            { id: 'robot', name: 'Robot', price: 250000, icon: '🤖', desc: 'Mechanical baker.', crumbs: ['crumb_robot_1.png', 'crumb_robot_2.png', 'crumb_robot_3.png'] },
+            { id: 'demon', name: 'Demon', price: 666000, icon: '😈', desc: 'Oven of hell.', crumbs: ['crumb_demon_1.png'] },
+            { id: 'space', name: 'Cosmos', price: 2000000, icon: '👽', desc: 'Out of this world.', crumbs: ['crumb_space_1.png', 'crumb_space_2.png', 'crumb_space_3.png', 'crumb_space_4.png'] },
+            { id: 'panda', name: 'Panda', price: 0, icon: '🐼', locked: true, desc: 'Cute but bakes hard.', crumbs: ['crumb_panda_1.png'] },
+            { id: 'major', name: 'Major', price: 0, icon: '🎩', locked: true, desc: 'Only for the richest.', crumbs: ['crumb_major_1.png'] }
+        ];
+
+        const ITEMS = {
+            'pin_1': { id: 'pin_1', name: "Granny's Relic", slot: 'slot1', rarity: 'common', rarityVal: 1, val: 2, imgBg: 'assets/pin_1_bg.png', img: 'assets/pin_1.png', fb: '🪵', desc: 'Base Click: +2' },
+            'pin_2': { id: 'pin_2', name: "Teflon Roller", slot: 'slot1', rarity: 'uncommon', rarityVal: 2, val: 8, imgBg: 'assets/pin_2_bg.png', img: 'assets/pin_2.png', fb: '🟢', desc: 'Base Click: +8' },
+            'pin_3': { id: 'pin_3', name: "Titanium Mallet", slot: 'slot1', rarity: 'rare', rarityVal: 3, val: 25, imgBg: 'assets/pin_3_bg.png', img: 'assets/pin_3.png', fb: '🔵', desc: 'Base Click: +25' },
+            'pin_4': { id: 'pin_4', name: "Cyber-Roller", slot: 'slot1', rarity: 'epic', rarityVal: 4, val: 100, imgBg: 'assets/pin_4_bg.png', img: 'assets/pin_4.png', fb: '🟣', desc: 'Base Click: +100' },
+            'pin_5': { id: 'pin_5', name: "Tycoon Roller", slot: 'slot1', rarity: 'legendary', rarityVal: 5, val: 500, imgBg: 'assets/pin_5_bg.png', img: 'assets/pin_5.png', fb: '🟡', desc: 'Base Click: +500' },
+            
+            'hat_1': { id: 'hat_1', name: "Paper Hat", slot: 'slot2', rarity: 'common', rarityVal: 1, val: 2, imgBg: 'assets/hat_1_bg.png', img: 'assets/hat_1.png', fb: '🧢', desc: '+2% to Oven Income' },
+            'hat_2': { id: 'hat_2', name: "Worker's Cap", slot: 'slot2', rarity: 'uncommon', rarityVal: 2, val: 5, imgBg: 'assets/hat_2_bg.png', img: 'assets/hat_2.png', fb: '🧢', desc: '+5% to Oven Income' },
+            'hat_3': { id: 'hat_3', name: "Chef's Toque", slot: 'slot2', rarity: 'rare', rarityVal: 3, val: 15, imgBg: 'assets/hat_3_bg.png', img: 'assets/hat_3.png', fb: '👨‍🍳', desc: '+15% to Oven Income' },
+            'hat_4': { id: 'hat_4', name: "Cyber-Visor", slot: 'slot2', rarity: 'epic', rarityVal: 4, val: 40, imgBg: 'assets/hat_4_bg.png', img: 'assets/hat_4.png', fb: '🥽', desc: '+40% to Oven Income' },
+            'hat_5': { id: 'hat_5', name: "Golden Crown", slot: 'slot2', rarity: 'legendary', rarityVal: 5, val: 100, imgBg: 'assets/hat_5_bg.png', img: 'assets/hat_5.png', fb: '👑', desc: 'Doubles all Passive Income' },
+            
+            'apron_1': { id: 'apron_1', name: "Basic Apron", slot: 'slot3', rarity: 'common', rarityVal: 1, val: 5, imgBg: 'assets/apron_1_bg.png', img: 'assets/apron_1.png', fb: '🎽', desc: '+5% to Click Power' },
+            'apron_2': { id: 'apron_2', name: "Worker Uniform", slot: 'slot3', rarity: 'uncommon', rarityVal: 2, val: 12, imgBg: 'assets/apron_2_bg.png', img: 'assets/apron_2.png', fb: '👕', desc: '+12% to Click Power' },
+            'apron_3': { id: 'apron_3', name: "Chef's Jacket", slot: 'slot3', rarity: 'rare', rarityVal: 3, val: 30, imgBg: 'assets/apron_3_bg.png', img: 'assets/apron_3.png', fb: '🧑‍🍳', desc: '+30% to Click Power' },
+            'apron_4': { id: 'apron_4', name: "Cyber Apron", slot: 'slot3', rarity: 'epic', rarityVal: 4, val: 80, imgBg: 'assets/apron_4_bg.png', img: 'assets/apron_4.png', fb: '🦾', desc: '+80% to Click Power' },
+            'apron_5': { id: 'apron_5', name: "Emperor Mantle", slot: 'slot3', rarity: 'legendary', rarityVal: 5, val: 250, imgBg: 'assets/apron_5_bg.png', img: 'assets/apron_5.png', fb: '🧥', desc: '+250% to Click Power' },
+            
+            'aura_1': { id: 'aura_1', name: "Silver Whisk", slot: 'slot4', rarity: 'common', rarityVal: 1, val: 1, imgBg: 'assets/aura_1_bg.png', img: 'assets/aura_1.png', fb: '🥄', desc: '+1 Flat Crumb per Click' },
+            'aura_2': { id: 'aura_2', name: "Heat Mitts", slot: 'slot4', rarity: 'uncommon', rarityVal: 2, val: 5, imgBg: 'assets/aura_2_bg.png', img: 'assets/aura_2.png', fb: '🧤', desc: '-5% to Oven Upgrades' },
+            'aura_3': { id: 'aura_3', name: "Precision Scales", slot: 'slot4', rarity: 'rare', rarityVal: 3, val: 2, imgBg: 'assets/aura_3_bg.png', img: 'assets/aura_3.png', fb: '⚖️', desc: '2% chance for x10 Critical Hit' },
+            'aura_4': { id: 'aura_4', name: "Cyber Shield", slot: 'slot4', rarity: 'epic', rarityVal: 4, val: 50, imgBg: 'assets/aura_4_bg.png', img: 'assets/aura_4.png', fb: '🛡️', desc: 'Offline Income lasts 6 hours instead of 4' },
+            'aura_5': { id: 'aura_5', name: "Tycoon's Seal", slot: 'slot4', rarity: 'legendary', rarityVal: 5, val: 0.1, imgBg: 'assets/aura_5_bg.png', img: 'assets/aura_5.png', fb: '💍', desc: '0.1% chance to drop a Ticket on click' }
+        };
+
+        const CHESTS = [
+            { id: 'c1', name: 'Wooden Box', cost: 500, cur: 'score', img: 'assets/chest_1.png', desc: 'Common gear.', drop: { common: 80, uncommon: 14, rare: 5, epic: 1, legendary: 0 } },
+            { id: 'c2', name: 'Iron Safe', cost: 5000, cur: 'score', img: 'assets/chest_2.png', desc: 'Solid choice.', drop: { common: 42, uncommon: 45, rare: 10, epic: 3, legendary: 0 } },
+            { id: 'c3', name: 'Gold Vault', cost: 25000, cur: 'score', img: 'assets/chest_3.png', desc: 'High rare chance.', drop: { common: 10, uncommon: 30, rare: 45, epic: 14.5, legendary: 0.5 } },
+            { id: 'c4', name: 'Neon Chest', cost: 100000, cur: 'score', img: 'assets/chest_4.png', desc: 'Cyber loot.', drop: { common: 0, uncommon: 20, rare: 35, epic: 43, legendary: 2 } },
+            { id: 'c5', name: 'Referral Boss', cost: 5, cur: 'tickets', img: 'assets/chest_5.png', desc: 'Best odds.', drop: { common: 0, uncommon: 15, rare: 35, epic: 45, legendary: 5 } }
+        ];
+
+        const TASKS_DATA = [
+            { id: 'ch1', title: 'Join Official Channel', desc: 't.me/Crypto_trade_KORZH', reward: 2, check: true },
+            { id: 't1', title: 'First Thousand', desc: 'Tap 1,000 times total', reward: 1, reqClicks: 1000 }
+        ];
+
+        // --- 6. GAME STATE ---
+        let game = { 
+            score: 0, totalScore: 0, tokens: 0, tickets: 0, lastBonus: 0,
+            ovens: [0,0,0,0,0,0], skins: ['classic'], activeSkin: 'classic', maxLvl: 0, 
+            inventory: [], equipped: { slot1: null, slot2: null, slot3: null, slot4: null },
+            lastLogin: Date.now(), totalClicks: 0, history: [], tasksDone: [], invitedBy: null, referrals: []
+        };
+
+        let curShopTab = 'ovens'; let curChestsTab = 'chests'; let activeInvSlot = null;
+
+        // --- 7. FIREBASE SYNC & INITIALIZATION ---
+        async function initGame() {
+            try { const s = localStorage.getItem('korzh_v18'); if(s) { const p=JSON.parse(s); if(p.score !== undefined) game=p; }} catch(e){}
+
+            if (tgUser && tgUser.id) {
+                const userId = tgUser.id.toString();
+                try {
+                    const doc = await db.collection('users').doc(userId).get();
+                    if (doc.exists) {
+                        game = { ...game, ...doc.data() };
+                    } else {
+                        // НОВИЙ ГРАВЕЦЬ І РЕФЕРАЛИ
+                        game.referrals = [];
+                        const startParam = tg.initDataUnsafe?.start_param;
+                        if (startParam && startParam.startsWith('r_')) {
+                            const inviterId = startParam.replace('r_', '');
+                            game.invitedBy = inviterId;
+                            
+                            db.collection('users').doc(inviterId).update({
+                                tickets: firebase.firestore.FieldValue.increment(1),
+                                referrals: firebase.firestore.FieldValue.arrayUnion(tgUsername)
+                            }).catch(()=>{});
+                        }
+                    }
+                } catch(e) { console.log("Cloud load error", e); }
+            }
+
+            const now = Date.now();
+            if(game.lastLogin && game.lastLogin < now) {
+                let diffMs = now - game.lastLogin;
+                let maxHours = (game.equipped.slot4 === 'aura_4') ? 6 : 4;
+                let maxMs = maxHours * 3600 * 1000;
+                if(diffMs > maxMs) diffMs = maxMs;
+                let earned = Math.floor((diffMs / 1000) * calcIncome());
+                if(earned > 0) {
+                    game.score += earned; game.totalScore += earned;
+                    document.getElementById('offline-crumbs').innerText = earned.toLocaleString();
+                    document.getElementById('offline-overlay').style.display = 'flex';
+                }
+            }
+            game.lastLogin = now;
+            isDataLoaded = true;
+
+            document.getElementById('korzh-img').style.backgroundImage = `url('assets/skin_${game.activeSkin}.png')`;
+            updateUI(); renderChests(); renderEquipmentSlots(); renderTasks(); renderHistory(); loadLeaderboard();
+        }
+
+        // --- 8. SAVE LOGIC (LOCAL + CLOUD THROTTLE) ---
+        let lastCloudSave = 0;
+        function save() { 
+            localStorage.setItem('korzh_v18', JSON.stringify(game)); 
+            if (!isDataLoaded || !tgUser || !tgUser.id) return;
+            
+            const now = Date.now();
+            if (now - lastCloudSave > 5000) {
+                lastCloudSave = now;
+                saveToCloud();
+            }
+        }
+
+        async function saveToCloud() {
+            try {
+                await db.collection('users').doc(tgUser.id.toString()).set({
+                    ...game,
+                    username: tgUsername
+                }, { merge: true });
+            } catch(e) { console.log("Cloud save error", e); }
+        }
+
+        // --- 9. LEADERBOARD FETCH (СОРТУВАННЯ ЗА KORZH) ---
+        async function loadLeaderboard() {
+            const topList = document.querySelector('.leader-card');
+            if(!topList) return;
+            try {
+                const snapshot = await db.collection('users').orderBy('tokens', 'desc').limit(10).get();
+                let html = '';
+                let rank = 1;
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const icon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+                    const color = rank === 1 ? '#FFD700' : rank === 2 ? '#C0C0C0' : rank === 3 ? '#CD7F32' : '#fff';
+                    const isMe = tgUser && doc.id === tgUser.id.toString();
+                    html += `<div class="leader-row ${isMe ? 'my-rank' : ''}" style="${isMe ? 'background:rgba(240, 196, 32, 0.1); border-radius:10px;' : ''}">
+                                <div class="rank" style="font-size:20px">${icon}</div>
+                                <div class="user-info" style="color:${color}">${data.username || 'Player'} ${isMe ? '(YOU)' : ''}</div>
+                                <div class="user-score">${data.tokens || 0} KORZH</div>
+                             </div>`;
+                    rank++;
+                });
+                topList.innerHTML = html;
+            } catch(e) { console.log("Leaderboard error", e); }
+        }
+
+        // --- 10. REFERRAL LINK GENERATOR ---
+        function inviteFriend() { 
+            const botUsername = 'Crypto_trade_KORZH_bot'; 
+            const refLink = `https://t.me/${botUsername}?start=r_${tgUser?.id || '123'}`;
+            const text = 'Join my bakery, tap Korzh and get rich!';
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(text)}`); 
+        }
+
+        // --- GAME LOOP ---
+        setInterval(() => {
+            let inc = calcIncome();
+            if(inc > 0) { game.score += inc; game.totalScore += inc; checkLevel(); }
+            game.lastLogin = Date.now(); save(); updateUI(); checkBonus();
+        }, 1000);
+
+        function calcIncome() {
+            let b = 0; game.ovens.forEach((c, i) => b += c * OVENS[i].inc);
+            let m = 1; if(game.equipped.slot2) m += ITEMS[game.equipped.slot2].val / 100;
+            return b * m;
+        }
+
+        function getClickPower() {
+            let b = 1;
+            if(game.equipped.slot1) b += ITEMS[game.equipped.slot1].val;
+            if(game.equipped.slot4 === 'aura_1') b += 1;
+            let m = 1; if(game.equipped.slot3) m += ITEMS[game.equipped.slot3].val / 100;
+            let f = b * m;
+            if(game.equipped.slot4 === 'aura_3' && Math.random() < 0.02) { f *= 10; notify("CRITICAL HIT x10! ⚖️"); }
+            return Math.floor(f);
+        }
+
+        const wrap = document.getElementById('korzh-wrapper');
+        function tap(e) {
+            if(e.type === 'pointerdown' && e.pointerType === 'mouse' && 'ontouchstart' in window) return; 
+            playSound('click'); 
+            game.totalClicks++;
+            const power = getClickPower();
+            game.score += power; game.totalScore += power; checkLevel(); updateUI();
+            
+            if(game.equipped.slot4 === 'aura_5' && Math.random() < 0.001) {
+                game.tickets++; notify("JACKPOT! Ticket dropped!"); playSound('chime');
+                let t = document.createElement('div'); t.className='floating-ticket'; t.style.backgroundImage="url('assets/ticket.png')";
+                t.style.left=(e.clientX||(e.touches && e.touches[0].clientX))+'px'; t.style.top=(e.clientY||(e.touches && e.touches[0].clientY))+'px';
+                document.body.appendChild(t); setTimeout(()=>t.remove(), 1500);
+            }
+            
+            wrap.style.transform = "scale(0.95)"; setTimeout(()=>wrap.style.transform="scale(1)", 80);
+            
+            const skin = SKINS.find(s => s.id === game.activeSkin);
+            const crumbs = skin && skin.crumbs ? skin.crumbs : ['crumb_classic_1.png'];
+            const el = document.createElement('div'); el.className = 'floating-crumb';
+            el.style.backgroundImage = `url('assets/${crumbs[Math.floor(Math.random()*crumbs.length)]}')`;
+            el.style.left = (e.clientX||(e.touches && e.touches[0].clientX))+'px'; el.style.top = (e.clientY||(e.touches && e.touches[0].clientY))+'px';
+            document.body.appendChild(el); setTimeout(()=>el.remove(), 800);
+            if(tg) tg.HapticFeedback.impactOccurred('light'); renderTasks();
+        }
+
+        function getOvenCost(i) {
+            let cost = OVENS[i].base * Math.pow(1.2, game.ovens[i]);
+            if(game.equipped.slot4 === 'aura_2') cost *= 0.95;
+            return Math.floor(cost);
+        }
+
+        function getTokenCost() { return Math.floor(10000 * Math.pow(1.1, game.tokens)); }
+
+        function exchange() {
+            let cost = getTokenCost();
+            if(game.score >= cost) {
+                game.score -= cost; game.tokens++; addHistory(`Minted 1 KORZH for ${cost.toLocaleString()} Crumbs`);
+                document.getElementById('mint-anim').style.display='flex';
+                setTimeout(()=>{ document.getElementById('mint-anim').style.display='none'; }, 1500);
+                save(); updateUI(); notify("Minted 1 KORZH!");
+            } else notify(`Need ${cost.toLocaleString()} Crumbs`);
+        }
+
+        function checkLevel() {
+            let idx = 0; for(let i=LEVELS.length-1; i>=0; i--) { if(game.totalScore >= LEVELS[i].min) { idx = i; break; } }
+            if(idx > game.maxLvl) {
+                game.maxLvl = idx; const l = LEVELS[idx];
+                document.getElementById('popup-lvl-num').innerText = idx+1;
+                document.getElementById('popup-lvl-title').innerText = l.title;
+                document.getElementById('popup-lvl-reward').innerText = l.skin ? `Unlocked: ${l.skin}` : 'Keep going!';
+                document.getElementById('levelup-overlay').style.display = 'flex';
+                if(l.skin && !game.skins.includes(l.skin)) game.skins.push(l.skin);
+                if(idx === 6) { game.tickets += 5; notify("+5 Tickets! <img src='assets/ticket.png' style='width:16px;vertical-align:middle;'>"); }
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').innerText = Math.floor(game.score).toLocaleString();
+            document.getElementById('wallet-crumbs').innerText = Math.floor(game.score).toLocaleString();
+            document.getElementById('wallet-tokens').innerText = game.tokens;
+            document.getElementById('ui-tickets').innerText = game.tickets;
+            document.getElementById('income').innerText = calcIncome().toLocaleString();
+            document.getElementById('exchange-rate').innerText = getTokenCost().toLocaleString();
+            document.getElementById('top-bal').innerText = game.tokens + " KORZH";
+            
+            const l = game.maxLvl; const cur = LEVELS[l]; const next = LEVELS[l+1];
+            document.getElementById('lvl-num').innerText = l+1;
+            document.getElementById('lvl-title').innerText = cur.title;
+            if(next) document.getElementById('lvl-fill').style.width = Math.min(100, ((game.totalScore-cur.min)/(next.min-cur.min))*100)+"%";
+            else document.getElementById('lvl-fill').style.width = "100%";
+
+            // ОНОВЛЕННЯ СПИСКУ ДРУЗІВ
+            const friendsCount = game.referrals ? game.referrals.length : 0;
+            const friendsElem = document.getElementById('ui-friends-count');
+            if(friendsElem) friendsElem.innerText = friendsCount;
+            
+            const friendsList = document.getElementById('friends-list');
+            if(friendsList) {
+                if(friendsCount > 0) {
+                    friendsList.innerHTML = game.referrals.map(n => `<div style="background:#222; padding:6px; margin-bottom:4px; border-radius:6px; color:white;">👤 ${n}</div>`).join('');
+                } else {
+                    friendsList.innerHTML = "No friends invited yet.";
+                }
+            }
+        }
+
+        const BONUS_DATA = [ {min:1,max:50}, {min:50,max:200}, {min:200,max:800}, {min:800,max:2500}, {min:2500,max:10000}, {min:10000,max:40000}, {min:40000,max:120000}, {min:120000,max:400000}, {min:400000,max:800000}, {min:800000,max:1000000} ];
+        
+        function checkBonus() {
+            const d = 4*3600*1000 - (Date.now() - game.lastBonus);
+            const b = document.getElementById('bonus-btn');
+            if(d <= 0) { b.classList.add('ready'); b.classList.remove('used'); } else { b.classList.remove('ready'); b.classList.add('used'); }
+        }
+
+        function claimBonus() {
+            if(Date.now() - game.lastBonus < 4*3600*1000) return;
+            let rng = BONUS_DATA[game.maxLvl] || BONUS_DATA[0];
+            let dropTicket = Math.random() < (game.maxLvl < 1 ? 0 : 0.01 * game.maxLvl);
+            if(dropTicket && game.maxLvl > 0) {
+                game.tickets++; notify("JACKPOT! +1 <img src='assets/ticket.png' style='width:16px;vertical-align:middle;'>"); playSound('chime');
+            } else {
+                let r = Math.floor(Math.random()*(rng.max-rng.min+1))+rng.min;
+                game.score += r; game.totalScore += r; notify(`Bonus +${r.toLocaleString()} Crumbs`);
+            }
+            game.lastBonus = Date.now(); addHistory("Claimed Time Bonus"); save(); updateUI(); checkBonus();
+        }
+
+        function openChest(id) {
+            const chest = CHESTS.find(c => c.id === id);
+            if(chest.cur === 'score' && game.score >= chest.cost) game.score -= chest.cost;
+            else if(chest.cur === 'tickets' && game.tickets >= chest.cost) game.tickets -= chest.cost;
+            else return;
+
+            let rand = Math.random() * 100; let rarity = 'common';
+            if(rand < chest.drop.legendary) rarity = 'legendary';
+            else if(rand < chest.drop.legendary+chest.drop.epic) rarity = 'epic';
+            else if(rand < chest.drop.legendary+chest.drop.epic+chest.drop.rare) rarity = 'rare';
+            else if(rand < chest.drop.legendary+chest.drop.epic+chest.drop.rare+chest.drop.uncommon) rarity = 'uncommon';
+
+            const possible = Object.values(ITEMS).filter(i => i.rarity === rarity);
+            const item = possible.length > 0 ? possible[Math.floor(Math.random()*possible.length)] : ITEMS['pin_1'];
+            
+            game.inventory.push(item.id); save(); updateUI(); renderChests();
+            addHistory(`Opened ${chest.name} (Got ${item.rarity.toUpperCase()})`);
+            
+            const modal = document.getElementById('chest-anim-modal'); const shake = document.getElementById('chest-shaking-img');
+            const reward = document.getElementById('chest-reward-box'); const close = document.getElementById('chest-close-btn');
+            modal.style.display='flex'; shake.style.display='flex'; reward.style.display='none'; close.style.display='none';
+            shake.classList.remove('flash-anim'); shake.classList.add('shake-anim');
+            shake.innerHTML = `<img src="${chest.img}" style="width:100%;height:100%;object-fit:contain;">`;
+
+            if(tg) tg.HapticFeedback.impactOccurred('heavy');
+            setTimeout(() => {
+                shake.classList.remove('shake-anim'); shake.classList.add('flash-anim'); playSound('open');
+                if(tg) tg.HapticFeedback.notificationOccurred('success');
+                setTimeout(() => {
+                    shake.style.display='none'; playSound('chime');
+                    let color = item.rarity==='legendary'?'#f1c40f':item.rarity==='epic'?'#9b59b6':item.rarity==='rare'?'#3498db':item.rarity==='uncommon'?'#2ecc71':'#aaa';
+                    reward.innerHTML = `<div class="grid-card" style="width:100%; height:100%; box-shadow: 0 0 30px ${color}55;"><div class="card-inner"><div class="card-front" style="border-color:${color}"><h3 style="color:#f0c420; margin:0 0 10px 0;">YOU GOT:</h3><div class="card-img-box" style="margin-bottom:15px;"><img src="${item.imgBg}" style="max-width:100px; max-height:100px;"></div><div class="card-title" style="font-size:18px;">${item.name}</div><div class="card-subtitle" style="color:${color}; font-size:14px; margin-top:5px;">${item.rarity.toUpperCase()}</div></div></div></div>`;
+                    reward.style.display='block'; close.style.display='block';
+                }, 400); 
+            }, 500); 
+        }
+
+        function nav(s) { document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active')); document.getElementById('screen-'+s).classList.add('active'); document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active')); document.getElementById('nav-'+s).classList.add('active'); if(s==='shop') renderShop(); if(s==='chests') { switchChestsTab(curChestsTab); } if(s==='wallet'||s==='taskstop') { updateUI(); if(s==='taskstop') loadLeaderboard(); } }
+        function switchTaskTop(t) { document.getElementById('tab-tt-tasks').classList.remove('active'); document.getElementById('tab-tt-top').classList.remove('active'); document.getElementById('tab-tt-'+t).classList.add('active'); document.getElementById('view-tasks').style.display = t==='tasks'?'block':'none'; document.getElementById('view-top').style.display = t==='top'?'block':'none'; if(t==='top') loadLeaderboard(); }
+        function switchShop(t) { curShopTab=t; document.querySelectorAll('#screen-shop .tab').forEach(e=>e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); renderShop(); }
+        function switchChestsTab(t) { curChestsTab=t; document.querySelectorAll('#screen-chests .tab').forEach(e=>e.classList.remove('active')); if(t==='chests') { document.getElementById('tab-chests-buy').classList.add('active'); document.getElementById('chests-container').style.display='grid'; document.getElementById('global-inventory-container').style.display='none'; document.getElementById('inv-filters').style.display='none'; renderChests(); } else { document.getElementById('tab-chests-inv').classList.add('active'); document.getElementById('chests-container').style.display='none'; document.getElementById('global-inventory-container').style.display='grid'; document.getElementById('inv-filters').style.display='flex'; renderGlobalInventory(); } }
+        function toggleFlip(btn, event) { event.stopPropagation(); btn.closest('.card-inner').classList.toggle('flipped'); }
+        function closeChestAnim() { document.getElementById('chest-anim-modal').style.display = 'none'; }
+        function notify(m) { const n=document.getElementById('notify'); n.innerHTML=m; n.style.opacity=1; setTimeout(()=>n.style.opacity=0,2000); }
+        function addHistory(txt) { game.history.unshift({t:txt, d:new Date().toLocaleTimeString()}); if(game.history.length>5) game.history.pop(); renderHistory(); }
+        function renderHistory() { const h = document.getElementById('tx-history'); h.innerHTML=''; game.history.forEach(x => { h.innerHTML += `<div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; font-size:12px; display:flex; justify-content:space-between;"><span>${x.t}</span><span style="color:#888;">${x.d}</span></div>`; }); }
+
+        function buyOven(i, btnElem) {
+            const cost = getOvenCost(i);
+            if(game.score >= cost) {
+                game.score -= cost; game.ovens[i]++; save(); updateUI();
+                if(btnElem) { btnElem.style.transform = 'scale(0.9)'; btnElem.style.backgroundColor = '#2ed573'; setTimeout(() => { btnElem.style.transform = 'scale(1)'; renderShop(); }, 150); } else renderShop();
+            }
+        }
+
+        function renderShop() {
+            const cont = document.getElementById('shop-container'); cont.innerHTML = '';
+            if(curShopTab === 'ovens') {
+                OVENS.forEach((o, i) => {
+                    const cnt = game.ovens[i]; const cost = getOvenCost(i); const canBuy = game.score >= cost; const max = cnt >= 50;
+                    cont.innerHTML += `<div class="grid-card"><div class="card-inner"><div class="card-front"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-img-box"><img src="${o.img}" onerror="this.style.display='none';this.parentElement.innerText='${o.fb}';this.parentElement.style.fontSize='40px'"></div><div class="card-title">${o.name} <span style="color:#f0c420">x${cnt}</span></div><div class="card-subtitle">+${o.inc}/sec</div><button class="card-btn ${canBuy && !max ? 'buy' : ''}" onclick="buyOven(${i}, this)" ${!canBuy || max ? 'disabled' : ''} style="transition: 0.2s;">${max ? 'MAX' : cost.toLocaleString()}</button></div><div class="card-back"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-title" style="margin-bottom:10px;">${o.name}</div><div class="card-desc">${o.desc}</div></div></div></div>`;
+                });
+            } else {
+                SKINS.forEach(s => {
+                    const owned = game.skins.includes(s.id); const active = game.activeSkin === s.id; const canBuy = game.score >= s.price;
+                    let btn = ''; if(s.locked && !owned) btn = `<button class="card-btn" disabled>🔒 Lvl</button>`; else if(active) btn = `<button class="card-btn" disabled style="background:#2ed573; opacity:1;">Active</button>`; else if(owned) btn = `<button class="card-btn" style="background:#555;" onclick="setSkin('${s.id}')">Equip</button>`; else btn = `<button class="card-btn ${canBuy ? 'buy' : ''}" onclick="buySkin('${s.id}')" ${!canBuy ? 'disabled' : ''}>${s.price.toLocaleString()}</button>`;
+                    cont.innerHTML += `<div class="grid-card"><div class="card-inner"><div class="card-front"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-img-box"><img src="assets/skin_${s.id}.png" onerror="this.style.display='none';this.parentElement.innerText='${s.icon}';this.parentElement.style.fontSize='40px'"></div><div class="card-title" style="margin-bottom:8px;">${s.name}</div>${btn}</div><div class="card-back"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-title" style="margin-bottom:10px;">${s.name}</div><div class="card-desc">${s.desc}</div></div></div></div>`;
+                });
+            }
+        }
+
+        function renderChests() {
+            const cont = document.getElementById('chests-container'); cont.innerHTML = '';
+            CHESTS.forEach(c => {
+                const canBuy = c.cur === 'score' ? game.score >= c.cost : game.tickets >= c.cost;
+                let costContent = c.cur === 'tickets' ? `<img src="assets/ticket.png" style="width:14px; vertical-align:middle; margin-right:4px;">${c.cost}` : c.cost.toLocaleString();
+                cont.innerHTML += `<div class="grid-card"><div class="card-inner"><div class="card-front"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-img-box"><img src="${c.img}" style="max-width:60px; max-height:60px;" onerror="this.style.display='none';"></div><div class="card-title" style="font-size:14px; margin-bottom:5px;">${c.name}</div><button class="card-btn ${canBuy ? 'buy' : ''}" onclick="openChest('${c.id}')" ${!canBuy ? 'disabled' : ''}>${costContent}</button></div><div class="card-back"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-title" style="margin-bottom:10px;">${c.name}</div><div class="card-desc">${c.desc}</div><div style="font-size:10px; color:#888; margin-top:10px; text-align:left;">Leg: ${c.drop.legendary}%<br>Epic: ${c.drop.epic}%<br>Rare: ${c.drop.rare}%</div></div></div></div>`;
+            });
+        }
+
+        function renderGlobalInventory() {
+            const cont = document.getElementById('global-inventory-container'); cont.innerHTML = '';
+            const slotFilter = document.getElementById('filter-slot').value; const rarityFilter = document.getElementById('filter-rarity').value;
+            let filteredItems = game.inventory.map(id => ITEMS[id]).filter(i => i);
+            if(slotFilter !== 'all') filteredItems = filteredItems.filter(i => i.slot === slotFilter);
+            if(rarityFilter !== 'all') filteredItems = filteredItems.filter(i => i.rarity === rarityFilter);
+            filteredItems.sort((a, b) => b.rarityVal - a.rarityVal);
+            if(filteredItems.length === 0) { cont.innerHTML = `<div style="grid-column: span 2; text-align:center; color:#888; padding:20px;">No items match your filter.</div>`; return; }
+            filteredItems.forEach(item => {
+                let color = item.rarity==='legendary'?'#f1c40f':item.rarity==='epic'?'#9b59b6':item.rarity==='rare'?'#3498db':item.rarity==='uncommon'?'#2ecc71':'#aaa';
+                cont.innerHTML += `<div class="grid-card"><div class="card-inner"><div class="card-front" style="border-color:${color}55"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-img-box"><img src="${item.imgBg}" onerror="this.style.display='none'; this.parentElement.innerText='${item.fb}'; this.parentElement.style.fontSize='40px'"></div><div class="card-title">${item.name}</div><div class="card-subtitle" style="color:${color}">${item.rarity.toUpperCase()}</div><div style="font-size:10px; color:#888;">Slot: ${item.slot.replace('slot','')}</div></div><div class="card-back"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-title" style="margin-bottom:10px;">${item.name}</div><div class="card-desc">${item.desc}</div></div></div></div>`;
+            });
+        }
+
+        function openInventory(slotId) {
+            activeInvSlot = slotId; document.getElementById('inv-title').innerText = "Select: " + slotId.toUpperCase();
+            const cont = document.getElementById('inv-list'); cont.innerHTML = '';
+            let itemsForSlot = game.inventory.map(id => ITEMS[id]).filter(item => item && item.slot === slotId);
+            itemsForSlot.sort((a, b) => b.rarityVal - a.rarityVal);
+            cont.innerHTML += `<div class="grid-card"><div class="card-inner"><div class="card-front" style="justify-content:center; cursor:pointer;" onclick="equipItem(null)"><div style="font-size:30px; margin-bottom:10px;">✖</div><div class="card-btn">UNEQUIP</div></div></div></div>`;
+            itemsForSlot.forEach(item => {
+                const isEq = game.equipped[slotId] === item.id;
+                let color = item.rarity==='legendary'?'#f1c40f':item.rarity==='epic'?'#9b59b6':item.rarity==='rare'?'#3498db':item.rarity==='uncommon'?'#2ecc71':'#aaa';
+                let btn = isEq ? `<button class="card-btn" disabled style="background:#2ed573; opacity:1;">EQUIPPED</button>` : `<button class="card-btn buy" onclick="equipItem('${item.id}')">EQUIP</button>`;
+                cont.innerHTML += `<div class="grid-card"><div class="card-inner"><div class="card-front" style="border-color:${color}55"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-img-box"><img src="${item.imgBg}" onerror="this.style.display='none'; this.parentElement.innerText='${item.fb}'; this.parentElement.style.fontSize='40px'"></div><div class="card-title">${item.name}</div><div class="card-subtitle" style="color:${color}">${item.rarity.toUpperCase()}</div>${btn}</div><div class="card-back"><div class="info-btn" onclick="toggleFlip(this, event)">!</div><div class="card-title" style="margin-bottom:10px;">${item.name}</div><div class="card-desc">${item.desc}</div></div></div></div>`;
+            });
+            document.getElementById('inventory-screen').style.display = 'flex';
+        }
+
+        function closeInventory() { document.getElementById('inventory-screen').style.display = 'none'; }
+        function equipItem(id) { game.equipped[activeInvSlot] = id; save(); renderEquipmentSlots(); updateUI(); closeInventory(); if(tg) tg.HapticFeedback.impactOccurred('light'); }
+        function renderEquipmentSlots() {
+            ['slot1', 'slot2', 'slot3', 'slot4'].forEach(s => {
+                const uiSlot = document.getElementById('ui-' + s); const itemId = game.equipped[s];
+                if(itemId && ITEMS[itemId]) {
+                    uiSlot.classList.add('filled'); uiSlot.innerHTML = `<div class="slot-img-bg" style="background-image:url('${ITEMS[itemId].imgBg}')"></div>`;
+                } else {
+                    uiSlot.classList.remove('filled'); uiSlot.innerHTML = `${s.toUpperCase()}`;
+                }
+            });
+        }
+
+        function buySkin(id) { const s = SKINS.find(x=>x.id===id); if(game.score >= s.price) { game.score -= s.price; game.skins.push(id); save(); renderShop(); } }
+        function setSkin(id) { game.activeSkin = id; document.getElementById('korzh-img').style.backgroundImage = `url('assets/skin_${id}.png')`; save(); renderShop(); }
+
+        function renderTasks() {
+            const list = document.getElementById('tasks-list'); list.innerHTML = '';
+            TASKS_DATA.forEach(t => {
+                let isDone = game.tasksDone.includes(t.id);
+                let btn = '';
+                if(isDone) btn = `<button class="task-btn done" disabled>Done</button>`;
+                else if(t.check) btn = `<button class="task-btn" onclick="checkTask('${t.id}', '${t.desc}')">Check</button>`;
+                else if(t.reqClicks && game.totalClicks >= t.reqClicks) btn = `<button class="task-btn" style="background:#f0c420; color:black;" onclick="claimTask('${t.id}', ${t.reward})">Claim</button>`;
+                else if(t.reqClicks) btn = `<span style="font-size:11px; color:#888;">${game.totalClicks}/${t.reqClicks}</span>`;
+                
+                list.innerHTML += `<div class="task-card"><div class="task-info"><div class="task-title">${t.title}</div><div class="task-desc">${t.desc}</div><div style="color:#f0c420; font-size:12px; font-weight:bold; margin-top:5px;">+${t.reward} <img src="assets/ticket.png" style="width:14px; vertical-align:middle;"></div></div>${btn}</div>`;
+            });
+        }
+
+        function checkTask(id, url) { window.open('https://' + url); setTimeout(() => { claimTask(id, 2); }, 3000); }
+        function claimTask(id, r) { if(!game.tasksDone.includes(id)) { game.tasksDone.push(id); game.tickets += r; notify(`+${r} Tickets! <img src='assets/ticket.png' style='width:16px;vertical-align:middle;'>`); save(); updateUI(); renderTasks(); } }
+
+        // ЗАПУСК ГРИ
+        initGame();
+
+    </script>
+</body>
+</html>
