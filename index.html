@@ -478,7 +478,7 @@
             const topList = document.querySelector('.leader-card');
             if(!topList) return;
             try {
-                const snapshot = await db.collection('users').orderBy('tokens', 'desc').limit(10).get();
+                const snapshot = await db.collection('users').orderBy('tokens', 'desc').limit(100).get();
                 let html = '';
                 let rank = 1;
                 snapshot.forEach(doc => {
