@@ -552,6 +552,12 @@
 
         const wrap = document.getElementById('korzh-wrapper');
         function tap(e) {
+            // Захист від автоклікерів (не більше 12 кліків на секунду)
+        if (typeof game.clicksThisSec === 'undefined') { game.clicksThisSec = 0; game.lastClickSec = Math.floor(Date.now() / 1000); }
+        let nowSec = Math.floor(Date.now() / 1000);
+        if (nowSec !== game.lastClickSec) { game.lastClickSec = nowSec; game.clicksThisSec = 0; }
+        game.clicksThisSec++;
+        if (game.clicksThisSec > 12) return; // Ігноруємо надто швидкі кліки
             if(e.type === 'pointerdown' && e.pointerType === 'mouse' && 'ontouchstart' in window) return;
             playSound('click'); 
             game.totalClicks++;
